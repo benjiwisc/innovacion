@@ -7,11 +7,13 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -22,6 +24,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'rol',
+        'codigo_vinculacion',
     ];
 
     /**
@@ -45,5 +49,24 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+    public static function generarCodigo(): string
+    {
+        do {
+            $codigo = strtoupper(Str::random(8));
+        } while (self::where('codigo_vinculacion', $codigo)->exists());
+
+        return $codigo;
+    }
+
+    // Relaciones
+    public function vinculados()
+    {
+        return $this->hasMany(Vinculo::class, 'adulto_mayor_id');
+    }
+
+    public function adultoMayor()
+    {
+        return $this->hasOne(Vinculo::class, 'vinculado_id');
     }
 }

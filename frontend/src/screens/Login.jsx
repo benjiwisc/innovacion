@@ -1,23 +1,28 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useRouter } from "expo-router";
 import { COLORES, FUENTES } from "../constants/theme";
 
-export function Login() {
-  const [email, setEmail] = useState("");
+export function Login({ onIrRegistro }) {
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
+  const [error, setError]       = useState(null);
+  const [cargando, setCargando] = useState(false);
   const { login } = useAuth();
-  const router = useRouter();
 
-  const handleLogin = () => {
-    // Por ahora con datos falsos
-    if (email === "juan@mail.com" && password === "1234") {
-      login({ nombre: "Juan Pérez", email });
-      router.replace("/");  // va al menú principal
-    } else {
-      setError("Email o contraseña incorrectos");
+  const handleLogin = async () => {
+    setError(null);
+    setCargando(true);
+    try {
+      await login({ email, password });
+
+    } catch (err) {
+      const mensaje = err.response?.data?.message
+        ?? err.response?.data?.errors?.email?.[0]
+        ?? "Error al conectar con el servidor";
+      setError(mensaje);
+    } finally {
+      setCargando(false);
     }
   };
 
@@ -45,8 +50,18 @@ export function Login() {
         secureTextEntry
       />
 
-      <TouchableOpacity style={styles.boton} onPress={handleLogin}>
-        <Text style={styles.botonTexto}>Ingresar</Text>
+      <TouchableOpacity
+        style={[styles.boton, cargando && { opacity: 0.7 }]}
+        onPress={handleLogin}
+        disabled={cargando}
+      >
+        {cargando
+          ? <ActivityIndicator color={COLORES.blanco} />
+          : <Text style={styles.botonTexto}>Ingresar</Text>
+        }
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.link} onPress={onIrRegistro}>
+        <Text style={styles.linkTexto}>¿No tienes cuenta? Regístrate</Text>
       </TouchableOpacity>
     </View>
   );
@@ -98,4 +113,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 12,
   },
+  link: { marginTop: 20, alignItems: "center" },
+  linkTexto: { color: COLORES.primario, fontSize: FUENTES.medio },
 });

@@ -9,7 +9,7 @@ class PastilleroController extends Controller
     public function index()
     {
         $estados = PastilleroEstado::latest()->take(20)->get();
-        return view('dashboard', compact('estados'));
+        return response()->json($estados);
     }
     
     public function actualizarEstado(Request $request)

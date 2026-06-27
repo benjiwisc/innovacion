@@ -1,98 +1,67 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../context/AuthContext";
+import { COLORES, FUENTES } from "../constants/theme";
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
+interface Usuario {
+  id: number;
+  name: string;
+  email: string;
 }
 
 export default function HomeScreen() {
+  const { usuario } = useAuth() as { usuario: Usuario | null };
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <SafeAreaView style={styles.contenedor}>
+      <View style={styles.header}>
+        <Text style={styles.saludo}>Bienvenido 👋</Text>
+        <Text style={styles.nombre}>{usuario?.name}</Text>
+        <Text style={styles.email}>{usuario?.email}</Text>
+      </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+      <View style={styles.cuerpo}>
+        <Text style={styles.seccion}>Panel principal</Text>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+        <View style={styles.tarjeta}>
+          <Text style={styles.tarjetaTitulo}>✅ Sesión activa</Text>
+          <Text style={styles.tarjetaTexto}>
+            Has iniciado sesión correctamente con Sanctum.
+          </Text>
+        </View>
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+        <View style={styles.tarjeta}>
+          <Text style={styles.tarjetaTitulo}>🔐 Token Bearer</Text>
+          <Text style={styles.tarjetaTexto}>
+            Tu token está guardado en AsyncStorage y se envía automáticamente en cada petición.
+          </Text>
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+  contenedor: { flex: 1, backgroundColor: COLORES.fondo },
+  header: {
+    padding: 24,
+    backgroundColor: COLORES.blanco,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORES.borde,
   },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+  saludo: { fontSize: FUENTES.medio, color: COLORES.textoGris },
+  nombre: { fontSize: 20, fontWeight: "bold", color: COLORES.primario },
+  email: { fontSize: 12, color: COLORES.textoGris, marginTop: 2 },
+  cuerpo: { padding: 24 },
+  seccion: { fontSize: FUENTES.medio, fontWeight: "bold", color: COLORES.primario, marginBottom: 16 },
+  tarjeta: {
+    backgroundColor: COLORES.blanco,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORES.borde,
+    marginBottom: 12,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  tarjetaTitulo: { fontSize: FUENTES.medio, fontWeight: "bold", marginBottom: 6 },
+  tarjetaTexto: { fontSize: 12, color: COLORES.textoGris, lineHeight: 20 },
 });
