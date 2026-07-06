@@ -102,7 +102,7 @@ class PastilleroController extends Controller
 
         foreach ($horarios as $horario) {
             // El horario es "08:00". Creamos un objeto Carbon para hoy a esa hora
-            $horaAlarma = \Carbon\Carbon::createFromFormat('H:i', $horario->hora, 'America/Santiago');
+            $horaAlarma = \Carbon\Carbon::parse($horario->hora, 'America/Santiago');
             
             // Si la hora de la alarma ya pasó (o es ahora), pero está dentro de un rango de 60 minutos
             if ($now->greaterThanOrEqualTo($horaAlarma) && $now->diffInMinutes($horaAlarma) <= 60) {
@@ -142,7 +142,7 @@ class PastilleroController extends Controller
             ->get();
 
         foreach ($horarios as $horario) {
-            $horaProgramada = Carbon::createFromFormat('H:i', $horario->hora)
+            $horaProgramada = Carbon::parse($horario->hora)
                 ->setDate($ahora->year, $ahora->month, $ahora->day);
 
             if (abs($ahora->diffInMinutes($horaProgramada, false)) > 15) {
