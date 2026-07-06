@@ -100,11 +100,6 @@ class PastilleroController extends Controller
             ->where('dia_semana', $diaSemana)
             ->get();
 
-        $ultimosEstados = \App\Models\PastilleroEstado::where('codigo_adulto', $user->codigo_vinculacion)
-            ->latest()
-            ->take(5)
-            ->get(['estado', 'created_at']);
-
         foreach ($horarios as $horario) {
             // El horario es "08:00". Creamos un objeto Carbon para hoy a esa hora
             $horaAlarma = \Carbon\Carbon::parse($horario->hora, 'America/Santiago');
@@ -128,29 +123,7 @@ class PastilleroController extends Controller
             }
         }
 
-        return response()->json([
-            'alerta' => false,
-            'diagnostico' => [
-                'hora_servidor' => $now->toDateTimeString(),
-                'dia_semana' => $diaSemana,
-                'codigo' => $user->codigo_vinculacion,
-                'ultimos_estados' => $ultimosEstados,
-                'horarios_hoy' => $horarios->map(function($h) use ($now, $user) {
-                    $horaAlarma = \Carbon\Carbon::parse($h->hora, 'America/Santiago');
-                    $diffSeconds = $now->timestamp - $horaAlarma->timestamp;
-                    $yaRegistrado = \App\Models\PastilleroEstado::where('codigo_adulto', $user->codigo_vinculacion)
-                        ->where('created_at', '>=', $horaAlarma->copy()->subMinutes(2))
-                        ->exists();
-                    return [
-                        'medicamento' => $h->nombre_medicamento,
-                        'hora' => $h->hora,
-                        'ya_paso' => $diffSeconds >= 0,
-                        'diff_segundos' => $diffSeconds,
-                        'ya_registrado' => $yaRegistrado,
-                    ];
-                })
-            ]
-        ]);
+        return response()->json(['alerta' => false]);
     }
 
     private function crearNotificacionDeMedicamento(string $codigoAdulto, string $dispositivo): void
