@@ -23,4 +23,10 @@ jobs:
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
+
+            cd ${{ secrets.SERVER_PATH }}/frontend
+            npm install
+            ./node_modules/.bin/expo export --platform web
+            sudo chown -R www-data:www-data dist
+            sudo chmod -R 755 dist
             
