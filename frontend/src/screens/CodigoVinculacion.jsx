@@ -1,5 +1,5 @@
 import {
-  View, Text, StyleSheet, TouchableOpacity, Share, Alert
+  ScrollView, View, Text, StyleSheet, TouchableOpacity, Share, Alert
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { COLORES, FUENTES } from "../constants/theme";
@@ -26,10 +26,10 @@ export function CodigoVinculacion({ usuario }) {
   }
 
   return (
-    <View style={styles.contenedor}>
+    <ScrollView contentContainerStyle={styles.scrollContenedor} style={styles.contenedor}>
       <Text style={styles.titulo}>Tu código de vinculación</Text>
       <Text style={styles.subtitulo}>
-        Comparte este código con tus familiares o cuidadores para que puedan vincularse contigo.
+        Usa este código para conectar tu pastillero físico a internet o compartirlo con tus familiares.
       </Text>
 
       {/* Código grande */}
@@ -45,24 +45,37 @@ export function CodigoVinculacion({ usuario }) {
         <Text style={styles.botonTexto}>📤 Compartir código</Text>
       </TouchableOpacity>
 
-      {/* Info */}
+      {/* Info Vinculación Familiar */}
       <View style={styles.infoContenedor}>
-        <Text style={styles.infoTitulo}>¿Cómo funciona?</Text>
+        <Text style={styles.infoTitulo}>👥 Vincular con Familiar o Cuidador</Text>
         <Text style={styles.infoTexto}>
           1. Comparte este código con tu familiar o cuidador.{"\n"}
           2. Ellos lo ingresan al registrarse en MediApp.{"\n"}
-          3. Quedan vinculados a tu cuenta automáticamente.
+          3. Podrán ver tu estado y si has tomado tus medicamentos.
         </Text>
       </View>
-    </View>
+
+      {/* Info Vinculación Pastillero */}
+      <View style={[styles.infoContenedor, { marginTop: 16, backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
+        <Text style={[styles.infoTitulo, { color: '#1e40af' }]}>📡 Vincular con tu Pastillero Físico</Text>
+        <Text style={styles.infoTexto}>
+          1. Enciende tu pastillero inteligente.{"\n"}
+          2. Conéctate desde tu celular al WiFi llamado <Text style={{fontWeight: 'bold'}}>"Pastillero_Config"</Text>.{"\n"}
+          3. Se abrirá la configuración: selecciona tu red WiFi, ingresa la contraseña y luego escribe este código: <Text style={{fontWeight: 'bold', color: COLORES.primario}}>{usuario.codigo_vinculacion}</Text>.{"\n"}
+          4. ¡Guarda la configuración y listo!
+        </Text>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   contenedor: {
     flex: 1,
-    padding: 24,
     backgroundColor: COLORES.fondo,
+  },
+  scrollContenedor: {
+    padding: 24,
     alignItems: 'center',
   },
   titulo: {
