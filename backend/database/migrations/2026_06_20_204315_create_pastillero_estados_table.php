@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('dispositivo_id');
             $table->string('estado');
+            $table->string('codigo_adulto');
             $table->timestamps();
         });
     }

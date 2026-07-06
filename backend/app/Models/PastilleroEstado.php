@@ -9,5 +9,6 @@ class PastilleroEstado extends Model
     protected $fillable = [
         'dispositivo_id',
         'estado',
+        'codigo_adulto'
     ];
 }

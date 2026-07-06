@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\PastilleroController;
 use App\Http\Controllers\ForoController;
+use App\Http\Controllers\MedicamentoHorarioController;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -43,4 +44,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/foro/{publicacion}/like',     [ForoController::class, 'toggleLike']);
     Route::post('/foro/{publicacion}/comentar', [ForoController::class, 'comentar']);
     Route::delete('/foro/{publicacion}',        [ForoController::class, 'destroy']);
+
+    Route::get('/medicamentos',                 [MedicamentoHorarioController::class, 'index']);
+    Route::post('/medicamentos',                [MedicamentoHorarioController::class, 'store']);
+    Route::delete('/medicamentos/{horario}',    [MedicamentoHorarioController::class, 'destroy']);
 });

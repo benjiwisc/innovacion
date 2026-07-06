@@ -10,7 +10,7 @@ import axiosClient from "../lib/axios";
 import { useAuth } from "../context/AuthContext";
 import { COLORES, FUENTES } from "../constants/theme";
 
-const API_BASE = ''https://api.rentacarencoyhaique2.cl'';
+const API_BASE = 'http://127.0.0.1:8000';
 
 //Utilidades
 function formatFecha(fechaStr) {
