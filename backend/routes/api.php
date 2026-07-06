@@ -21,6 +21,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/reset-password',  [NewPasswordController::class, 'store'])->name('password.store');
 
     Route::post('/pastillero-status', [PastilleroController::class, 'actualizarEstado']);
+    Route::get('/pastillero-check', [PastilleroController::class, 'verificarAlarma']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {

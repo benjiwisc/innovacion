@@ -74,6 +74,57 @@ class PastilleroController extends Controller
         ], 200);
     }
 
+    public function verificarAlarma(Request $request)
+    {
+        $request->validate([
+            'codigo_adulto' => 'required|string'
+        ]);
+
+        $user = \App\Models\User::where('codigo_vinculacion', $request->input('codigo_adulto'))
+            ->where('rol', 'adulto_mayor')
+            ->first();
+
+        if (!$user) {
+            return response()->json([
+                'alerta' => false,
+                'message' => 'Código de vinculación inválido o no corresponde a un adulto mayor.'
+            ], 404);
+        }
+
+        $now = \Carbon\Carbon::now('America/Santiago');
+        $diaSemana = $now->locale('es')->dayName; // lunes, martes, etc.
+        $diaSemana = \Illuminate\Support\Str::ucfirst($diaSemana); // Lunes, Martes, etc.
+
+        // Obtener todos los horarios para hoy
+        $horarios = \App\Models\MedicamentoHorario::where('adulto_mayor_id', $user->id)
+            ->where('dia_semana', $diaSemana)
+            ->get();
+
+        foreach ($horarios as $horario) {
+            // El horario es "08:00". Creamos un objeto Carbon para hoy a esa hora
+            $horaAlarma = \Carbon\Carbon::createFromFormat('H:i', $horario->hora, 'America/Santiago');
+            
+            // Si la hora de la alarma ya pasó (o es ahora), pero está dentro de un rango de 60 minutos
+            if ($now->greaterThanOrEqualTo($horaAlarma) && $now->diffInMinutes($horaAlarma) <= 60) {
+                // Verificar si ya se registró un estado hoy después de la hora de esta alarma (margen de 2 minutos)
+                $yaRegistrado = \App\Models\PastilleroEstado::where('codigo_adulto', $user->codigo_vinculacion)
+                    ->where('created_at', '>=', $horaAlarma->copy()->subMinutes(2))
+                    ->exists();
+
+                if (!$yaRegistrado) {
+                    return response()->json([
+                        'alerta' => true,
+                        'medicamento' => $horario->nombre_medicamento,
+                        'dosis' => $horario->dosis,
+                        'hora_programada' => $horario->hora
+                    ]);
+                }
+            }
+        }
+
+        return response()->json(['alerta' => false]);
+    }
+
     private function crearNotificacionDeMedicamento(string $codigoAdulto, string $dispositivo): void
     {
         $adultoMayor = User::where('codigo_vinculacion', $codigoAdulto)->first();
