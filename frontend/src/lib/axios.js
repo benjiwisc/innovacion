@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const axiosClient = axios.create({
-    baseURL: 'http://api.rentacarencoyhaique2.cl/api',
+    baseURL: 'https://api.rentacarencoyhaique2.cl/api',
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',

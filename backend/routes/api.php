@@ -49,4 +49,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/medicamentos',                 [MedicamentoHorarioController::class, 'index']);
     Route::post('/medicamentos',                [MedicamentoHorarioController::class, 'store']);
     Route::delete('/medicamentos/{horario}',    [MedicamentoHorarioController::class, 'destroy']);
+
+     Route::post('/pastillero/confirmar', [PastilleroController::class, 'confirmarPresencial']);
 });

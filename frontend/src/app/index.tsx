@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, RefreshControl, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
 import { COLORES, FUENTES } from "../constants/theme";
@@ -21,11 +21,19 @@ interface Medicamento {
   hora: string;
 }
 
+interface PastilleroEstado {
+  id: number;
+  medicamento_id: number | null;
+  estado: 'TOMADA' | 'OLVIDADA' | 'TOMADA_TARDE';
+  confirmar_presencial: number | boolean;
+}
+
 const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
 export default function HomeScreen() {
   const { usuario } = useAuth() as { usuario: Usuario | null };
   const [medicamentos, setMedicamentos] = useState<Medicamento[]>([]);
+  const [estadosPastillero, setEstadosPastillero] = useState<PastilleroEstado[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const config = useRoleConfig();
@@ -33,16 +41,20 @@ export default function HomeScreen() {
 
   const diaHoy = DIAS_SEMANA[new Date().getDay()];
 
-  const cargarMedicamentosHoy = useCallback(async (esRefresh = false) => {
+  const cargarDatosHoy = useCallback(async (esRefresh = false) => {
     if (esRefresh) setRefreshing(true);
     else setCargando(true);
     try {
-      const { data } = await axiosClient.get('/medicamentos');
-      // Filtrar solo los medicamentos de hoy
-      const filtrados = data.filter((m: Medicamento) => m.dia_semana === diaHoy);
+      // 1. Obtener medicamentos programados
+      const resMedicamentos = await axiosClient.get('/medicamentos');
+      const filtrados = resMedicamentos.data.filter((m: Medicamento) => m.dia_semana === diaHoy);
       setMedicamentos(filtrados);
+
+      // 2. Obtener los estados del pastillero vinculados
+      const resEstados = await axiosClient.get('/pastillero');
+      setEstadosPastillero(resEstados.data);
     } catch (e) {
-      console.log('error home medicamentos:', e);
+      console.log('error home datos:', e);
     } finally {
       setCargando(false);
       setRefreshing(false);
@@ -50,8 +62,22 @@ export default function HomeScreen() {
   }, [diaHoy]);
 
   useEffect(() => {
-    cargarMedicamentosHoy();
-  }, [cargarMedicamentosHoy]);
+    cargarDatosHoy();
+  }, [cargarDatosHoy]);
+
+  const confirmarTomaPresencial = async (medicamentoId: number) => {
+    try {
+      await axiosClient.post(`/pastillero/confirmar`, {
+        medicamento_id: medicamentoId
+      });
+      
+      Alert.alert("Éxito", "Toma presencial registrada correctamente.");
+      cargarDatosHoy(true);
+    } catch (error) {
+      console.log("Error al confirmar toma presencial:", error);
+      Alert.alert("Error", "No se pudo registrar la confirmación presencial.");
+    }
+  };
 
   const formatHora = (horaStr: string) => {
     if (!horaStr) return '';
@@ -70,7 +96,7 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => cargarMedicamentosHoy(true)}
+            onRefresh={() => cargarDatosHoy(true)}
             colors={[COLORES.primario]}
           />
         }
@@ -86,17 +112,57 @@ export default function HomeScreen() {
             <Text style={styles.vacioSubtexto}>¡Disfruta tu día libre de dosis!</Text>
           </View>
         ) : (
-          medicamentos.map((item) => (
-            <View key={item.id} style={styles.tarjetaMed}>
-              <View style={styles.badgeHora}>
-                <Text style={styles.badgeHoraTexto}>🕒 {formatHora(item.hora)}</Text>
+          medicamentos.map((item) => {
+            // Se asocian los estados por ID mitigando diferencias de tipado primitivo (string/number)
+            const estadoRegistro = estadosPastillero.find(e => e.medicamento_id == item.id);
+            const estadoActual = estadoRegistro?.estado || 'PENDIENTE';
+            const esPresencial = Boolean(estadoRegistro?.confirmar_presencial);
+
+            return (
+              <View key={item.id} style={styles.tarjetaMed}>
+                <View style={styles.filaPrincipal}>
+                  <View style={styles.badgeHora}>
+                    <Text style={styles.badgeHoraTexto}>🕒 {formatHora(item.hora)}</Text>
+                  </View>
+                  <View style={styles.medInfo}>
+                    <Text style={styles.medNombre}>{item.nombre_medicamento}</Text>
+                    <Text style={styles.medDosis}>Dosis: {item.dosis}</Text>
+                  </View>
+                  
+                  {/* Badge de Estado Dinámico de la Base de Datos */}
+                  <View style={[
+                    styles.badgeEstado, 
+                    (estadoActual === 'TOMADA' || estadoActual === 'TOMADA_TARDE') ? styles.badgeTomado : 
+                    estadoActual === 'OLVIDADA' ? styles.badgeNoTomado : styles.badgePendiente
+                  ]}>
+                    <Text style={[
+                      styles.badgeEstadoTexto,
+                      (estadoActual === 'TOMADA' || estadoActual === 'TOMADA_TARDE') ? styles.textoTomado : 
+                      estadoActual === 'OLVIDADA' ? styles.textoNoTomado : styles.textoPendiente
+                    ]}>
+                      {estadoActual === 'TOMADA' ? 'Tomada' : 
+                       estadoActual === 'TOMADA_TARDE' ? 'Tarde' : 
+                       estadoActual === 'OLVIDADA' ? 'Olvidada' : 'Pendiente'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Separador */}
+                <View style={styles.divisor} />
+
+                {/* Botón de Acción Presencial */}
+                <TouchableOpacity
+                  style={[styles.btnPresencial, esPresencial && styles.btnPresencialConfirmado]}
+                  disabled={esPresencial}
+                  onPress={() => confirmarTomaPresencial(item.id)}
+                >
+                  <Text style={[styles.btnPresencialTexto, esPresencial && styles.btnPresencialTextoConfirmado]}>
+                    {esPresencial ? "✅ Presencial Confirmado" : "🤝 Confirmar Toma Presencial"}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <View style={styles.medInfo}>
-                <Text style={styles.medNombre}>{item.nombre_medicamento}</Text>
-                <Text style={styles.medDosis}>Dosis: {item.dosis}</Text>
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
 
         <Text style={[styles.seccion, { marginTop: 24 }]}>Panel informativo</Text>
@@ -132,11 +198,6 @@ const getStyles = (fontScale: number) => StyleSheet.create({
     fontWeight: "bold", 
     color: COLORES.primario 
   },
-  email: { 
-    fontSize: 12 * fontScale, 
-    color: COLORES.textoGris, 
-    marginTop: 2 
-  },
   cuerpo: { 
     padding: 24 
   },
@@ -147,10 +208,8 @@ const getStyles = (fontScale: number) => StyleSheet.create({
     marginBottom: 16 
   },
 
-  // Medicamentos hoy
+  // Tarjetas de Medicamentos
   tarjetaMed: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: COLORES.blanco,
     borderRadius: 12,
     padding: 16,
@@ -158,12 +217,16 @@ const getStyles = (fontScale: number) => StyleSheet.create({
     borderColor: COLORES.borde,
     marginBottom: 12,
   },
+  filaPrincipal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   badgeHora: {
     backgroundColor: '#e3f2fd',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    marginRight: 16,
+    marginRight: 12,
   },
   badgeHoraTexto: {
     color: '#1565c0',
@@ -182,6 +245,52 @@ const getStyles = (fontScale: number) => StyleSheet.create({
     fontSize: 13 * fontScale, 
     color: COLORES.textoGris, 
     marginTop: 2 
+  },
+
+  // Estilos de los estados (Mayúsculas)
+  badgeEstado: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  badgeEstadoTexto: {
+    fontSize: 12 * fontScale,
+    fontWeight: 'bold',
+  },
+  badgeTomado: { backgroundColor: '#e8f5e9' },
+  textoTomado: { color: '#2e7d32' },
+  badgeNoTomado: { backgroundColor: '#ffebee' },
+  textoNoTomado: { color: '#c62828' },
+  badgePendiente: { backgroundColor: '#f5f5f5' },
+  textoPendiente: { color: '#616161' },
+
+  // Separador Interno
+  divisor: {
+    height: 1,
+    backgroundColor: COLORES.borde,
+    marginVertical: 12,
+  },
+
+  // Botón Confirmar Presencial
+  btnPresencial: {
+    backgroundColor: COLORES.primario,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnPresencialConfirmado: {
+    backgroundColor: '#e8f5e9',
+    borderWidth: 1,
+    borderColor: '#a5d6a7',
+  },
+  btnPresencialTexto: {
+    color: COLORES.blanco,
+    fontWeight: 'bold',
+    fontSize: 13 * fontScale,
+  },
+  btnPresencialTextoConfirmado: {
+    color: '#2e7d32',
   },
 
   // Tarjeta vacía

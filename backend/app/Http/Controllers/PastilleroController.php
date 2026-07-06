@@ -10,6 +10,7 @@ use App\Models\Vinculo;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class PastilleroController extends Controller
 {
@@ -21,7 +22,6 @@ class PastilleroController extends Controller
         if ($user->rol === 'adulto_mayor') {
             $codigo = $user->codigo_vinculacion;
         } else {
-            
             $vinculo = Vinculo::with('adultoMayor')
                 ->where('vinculado_id', $user->id)
                 ->first();
@@ -34,7 +34,9 @@ class PastilleroController extends Controller
             ], 403);
         }
 
+        // Retornamos los estados incluyendo la relación del medicamento para el HomeScreen
         $estados = PastilleroEstado::where('codigo_adulto', $codigo)
+            ->with('medicamento')
             ->latest()
             ->take(20)
             ->get();
@@ -49,23 +51,28 @@ class PastilleroController extends Controller
             'estado' => 'required|string|in:TOMADA,OLVIDADA,TOMADA_TARDE',
             'codigo_adulto' => 'required|string'
         ]);
+
         $dispositivo = $request->input('dispositivo_id');
         $estado = $request->input('estado');
+        $codigoAdulto = $request->input('codigo_adulto');
+
+        // Intentar obtener el ID del medicamento en este rango horario para asociarlo en la BD
+        $medicamentoId = $this->obtenerMedicamentoIdActual($codigoAdulto);
 
         $registro = PastilleroEstado::create([
-            'dispositivo_id' => $request->input('dispositivo_id'),
-            'estado' => $request->input('estado'),
-            'codigo_adulto' => $request->input('codigo_adulto')
+            'dispositivo_id' => $dispositivo,
+            'estado' => $estado,
+            'codigo_adulto' => $codigoAdulto,
+            'confirmar_presencial' => false,
+            'medicamento_id' => $medicamentoId // Asociado dinámicamente si calza el horario
         ]);
 
         if ($estado === 'TOMADA') {
-            $this->crearNotificacionDeMedicamento(
-                $request->input('codigo_adulto'),
-                $dispositivo
-            );
+            $this->crearNotificacionDeMedicamento($codigoAdulto, $dispositivo);
         }
         
-        Log::info("Pastillero {$dispositivo} reporta estado: {$estado}");
+        Log::info("Pastillero {$dispositivo} reporta estado: {$estado} para el medicamento ID: " . ($medicamentoId ?? 'Ninguno'));
+        
         return response()->json([
             'success' => true,
             'message' => 'Estado recibido exitosamente.',
@@ -74,13 +81,73 @@ class PastilleroController extends Controller
         ], 200);
     }
 
+    /**
+     * 🤝 Procesa la confirmación presencial enviada por el Cuidador/Familiar desde React Native
+     */
+    public function confirmarPresencial(Request $request)
+    {
+        $request->validate([
+            'medicamento_id' => 'required|integer|exists:medicamento_horarios,id',
+        ]);
+
+        $user = $request->user();
+        $medicamentoId = $request->input('medicamento_id');
+
+        $codigo = null;
+        if ($user->rol === 'adulto_mayor') {
+            $codigo = $user->codigo_vinculacion;
+        } else {
+            $vinculo = Vinculo::with('adultoMayor')->where('vinculado_id', $user->id)->first();
+            $codigo = $vinculo?->adultoMayor?->codigo_vinculacion;
+        }
+
+        if (!$codigo) {
+            return response()->json(['message' => 'No asociado a ningún adulto mayor.'], 403);
+        }
+
+        // Buscar si ya hay un registro de este medicamento generado hoy por el Arduino
+        $registroHoy = PastilleroEstado::where('codigo_adulto', $codigo)
+            ->where('medicamento_id', $medicamentoId)
+            ->whereDate('created_at', Carbon::today())
+            ->latest()
+            ->first();
+
+        if ($registroHoy) {
+            // Si el Arduino lo marcó como OLVIDADA o PENDIENTE, lo corregimos a exitoso y presencial
+            $registroHoy->update([
+                'estado' => 'TOMADA',
+                'confirmar_presencial' => true
+            ]);
+        } else {
+            // Si el Arduino no reportó nada aún, generamos la fila de respaldo presencial
+            PastilleroEstado::create([
+                'dispositivo_id' => 'APP-MANUAL',
+                'estado' => 'TOMADA',
+                'codigo_adulto' => $codigo,
+                'confirmar_presencial' => true,
+                'medicamento_id' => $medicamentoId
+            ]);
+        }
+
+        // Forzar la creación de la notificación en el foro indicando el éxito
+        $this->crearNotificacionDeMedicamento($codigo, 'APP-MANUAL');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Toma presencial sincronizada correctamente.'
+        ], 200);
+    }
+
+    /**
+     * 🔔 MANTENIDO INTACTO: El Arduino lee este método exactamente igual para sonar o callarse.
+     */
     public function verificarAlarma(Request $request)
     {
         $request->validate([
             'codigo_adulto' => 'required|string'
         ]);
 
-        $user = \App\Models\User::where('codigo_vinculacion', $request->input('codigo_adulto'))
+        $user = User::where('codigo_vinculacion', $request->input('codigo_adulto'))
             ->where('rol', 'adulto_mayor')
             ->first();
 
@@ -91,24 +158,20 @@ class PastilleroController extends Controller
             ], 404);
         }
 
-        $now = \Carbon\Carbon::now('America/Santiago');
-        $diaSemana = $now->locale('es')->dayName; // lunes, martes, etc.
-        $diaSemana = \Illuminate\Support\Str::ucfirst($diaSemana); // Lunes, Martes, etc.
+        $now = Carbon::now('America/Santiago');
+        $diaSemana = Str::ucfirst($now->locale('es')->dayName);
 
-        // Obtener todos los horarios para hoy
-        $horarios = \App\Models\MedicamentoHorario::where('adulto_mayor_id', $user->id)
+        $horarios = MedicamentoHorario::where('adulto_mayor_id', $user->id)
             ->where('dia_semana', $diaSemana)
             ->get();
 
         foreach ($horarios as $horario) {
-            // El horario es "08:00". Creamos un objeto Carbon para hoy a esa hora
-            $horaAlarma = \Carbon\Carbon::parse($horario->hora, 'America/Santiago');
+            $horaAlarma = Carbon::parse($horario->hora, 'America/Santiago');
             
-            // Si la hora de la alarma ya pasó (o es ahora), pero está dentro de un rango de 60 minutos
             $diffSeconds = $now->timestamp - $horaAlarma->timestamp;
             if ($diffSeconds >= 0 && $diffSeconds <= 3600) {
-                // Verificar si ya se registró un estado hoy después de la hora de esta alarma (margen de 2 minutos)
-                $yaRegistrado = \App\Models\PastilleroEstado::where('codigo_adulto', $user->codigo_vinculacion)
+                // Sigue buscando por rangos de tiempo creados tal como lo programaste
+                $yaRegistrado = PastilleroEstado::where('codigo_adulto', $user->codigo_vinculacion)
                     ->where('created_at', '>=', $horaAlarma->copy()->subMinutes(2))
                     ->exists();
 
@@ -126,14 +189,13 @@ class PastilleroController extends Controller
         return response()->json(['alerta' => false]);
     }
 
-    private function crearNotificacionDeMedicamento(string $codigoAdulto, string $dispositivo): void
+    /**
+     * Busca qué medicamento está en el bloque horario actual (Margen 15 minutos)
+     */
+    private function obtenerMedicamentoIdActual(string $codigoAdulto): ?int
     {
         $adultoMayor = User::where('codigo_vinculacion', $codigoAdulto)->first();
-
-        if (!$adultoMayor) {
-            Log::warning("Pastillero {$dispositivo} reporto un codigo_adulto sin usuario asociado: {$codigoAdulto}");
-            return;
-        }
+        if (!$adultoMayor) return null;
 
         $ahora = now();
         $diaSemana = $this->diaSemanaEnEspanol($ahora);
@@ -146,20 +208,40 @@ class PastilleroController extends Controller
             $horaProgramada = Carbon::parse($horario->hora)
                 ->setDate($ahora->year, $ahora->month, $ahora->day);
 
-            if (abs($ahora->diffInMinutes($horaProgramada, false)) > 15) {
+            if (abs($ahora->diffInMinutes($horaProgramada, false)) <= 15) {
+                return $horario->id;
+            }
+        }
+        return null;
+    }
+
+    private function crearNotificacionDeMedicamento(string $codigoAdulto, string $dispositivo): void
+    {
+        $adultoMayor = User::where('codigo_vinculacion', $codigoAdulto)->first();
+        if (!$adultoMayor) return;
+
+        $ahora = now();
+        $diaSemana = $this->diaSemanaEnEspanol($ahora);
+
+        $horarios = MedicamentoHorario::where('adulto_mayor_id', $adultoMayor->id)
+            ->where('dia_semana', $diaSemana)
+            ->get();
+
+        foreach ($horarios as $horario) {
+            $horaProgramada = Carbon::parse($horario->hora)
+                ->setDate($ahora->year, $ahora->month, $ahora->day);
+
+            // Ajustado para permitir que notifique tanto en su margen natural de 15m como si fue forzado manualmente
+            if ($dispositivo !== 'APP-MANUAL' && abs($ahora->diffInMinutes($horaProgramada, false)) > 15) {
                 continue;
             }
 
-            $contenido = sprintf(
-                'Notificacion del pastillero: %s (%s) fue tomada dentro del horario programado de las %s.',
-                $horario->nombre_medicamento,
-                $horario->dosis,
-                $horaProgramada->format('H:i')
-            );
+            $contenido = $dispositivo === 'APP-MANUAL'
+                ? sprintf('Confirmación manual: El medicamento %s (%s) fue verificado presencialmente por su cuidador.', $horario->nombre_medicamento, $horario->dosis)
+                : sprintf('Notificacion del pastillero: %s (%s) fue tomada dentro del horario programado de las %s.', $horario->nombre_medicamento, $horario->dosis, $horaProgramada->format('H:i'));
 
             $yaExiste = Publicacion::where('user_id', $adultoMayor->id)
                 ->where('adulto_mayor_id', $adultoMayor->id)
-                ->where('tipo', 'normal')
                 ->where('contenido', $contenido)
                 ->whereDate('created_at', $ahora->toDateString())
                 ->exists();
@@ -174,8 +256,6 @@ class PastilleroController extends Controller
                 'contenido' => $contenido,
                 'tipo' => 'normal',
             ]);
-
-            Log::info("Notificacion creada en el foro para {$adultoMayor->id} desde {$dispositivo} por el horario {$horario->id}");
         }
     }
 
