@@ -122,7 +122,23 @@ class PastilleroController extends Controller
             }
         }
 
-        return response()->json(['alerta' => false]);
+        return response()->json([
+            'alerta' => false,
+            'diagnostico' => [
+                'hora_servidor' => $now->toDateTimeString(),
+                'dia_semana' => $diaSemana,
+                'codigo' => $user->codigo_vinculacion,
+                'horarios_hoy' => $horarios->map(function($h) use ($now) {
+                    $horaAlarma = \Carbon\Carbon::parse($h->hora, 'America/Santiago');
+                    return [
+                        'medicamento' => $h->nombre_medicamento,
+                        'hora' => $h->hora,
+                        'ya_paso' => $now->greaterThanOrEqualTo($horaAlarma),
+                        'diff_minutos' => $now->diffInMinutes($horaAlarma),
+                    ];
+                })
+            ]
+        ]);
     }
 
     private function crearNotificacionDeMedicamento(string $codigoAdulto, string $dispositivo): void
