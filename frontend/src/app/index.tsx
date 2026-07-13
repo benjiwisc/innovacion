@@ -147,19 +147,21 @@ export default function HomeScreen() {
                   </View>
                 </View>
 
-                {/* Separador */}
-                <View style={styles.divisor} />
-
-                {/* Botón de Acción Presencial */}
-                <TouchableOpacity
-                  style={[styles.btnPresencial, esPresencial && styles.btnPresencialConfirmado]}
-                  disabled={esPresencial}
-                  onPress={() => confirmarTomaPresencial(item.id)}
-                >
-                  <Text style={[styles.btnPresencialTexto, esPresencial && styles.btnPresencialTextoConfirmado]}>
-                    {esPresencial ? "✅ Presencial Confirmado" : "🤝 Confirmar Toma Presencial"}
-                  </Text>
-                </TouchableOpacity>
+                {/* Botón de Acción Presencial (Solo si se le olvidó a la persona) */}
+                {estadoActual === 'OLVIDADA' && (
+                  <>
+                    <View style={styles.divisor} />
+                    <TouchableOpacity
+                      style={[styles.btnPresencial, esPresencial && styles.btnPresencialConfirmado]}
+                      disabled={esPresencial}
+                      onPress={() => confirmarTomaPresencial(item.id)}
+                    >
+                      <Text style={[styles.btnPresencialTexto, esPresencial && styles.btnPresencialTextoConfirmado]}>
+                        {esPresencial ? "✅ Presencial Confirmado" : "🤝 Confirmar Toma Presencial"}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             );
           })
