@@ -126,12 +126,33 @@ export function Pastillero() {
         }
         renderItem={({ item }) => (
           <View style={styles.tarjeta}>
-            <View style={styles.tarjetaFila}>
-              <View>
-                <Text style={styles.dispositivo}>📡 {item.dispositivo_id}</Text>
-                <Text style={styles.fecha}>{formatFecha(item.created_at)}</Text>
+            <View style={styles.tarjetaHeader}>
+              <View style={styles.medInfoContainer}>
+                <Text style={styles.medicamentoNombre}>
+                  {item.medicamento ? `💊 ${item.medicamento.nombre_medicamento}` : '💊 Medicamento no especificado'}
+                </Text>
+                {item.medicamento && (
+                  <Text style={styles.medicamentoDosis}>Dosis: {item.medicamento.dosis}</Text>
+                )}
               </View>
               <BadgeEstado estado={item.estado} fontScale={config.fontScale} />
+            </View>
+            
+            <View style={styles.divisor} />
+
+            <View style={styles.tarjetaFooter}>
+              <View>
+                <Text style={styles.dispositivo}>
+                  {item.dispositivo_id === 'APP-MANUAL' ? '📱 Registro Manual' : `📡 ${item.dispositivo_id}`}
+                </Text>
+                <Text style={styles.fecha}>{formatFecha(item.created_at)}</Text>
+              </View>
+              
+              {!!item.confirmar_presencial && (
+                <View style={styles.badgePresencial}>
+                  <Text style={styles.badgePresencialTexto}>🤝 Verificado Presencial</Text>
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -141,23 +162,91 @@ export function Pastillero() {
 }
 
 const getStyles = (fontScale) => StyleSheet.create({
-  contenedor:        { flex: 1, backgroundColor: COLORES.fondo },
+  contenedor:        { flex: 1, backgroundColor: '#F8FAFC' },
   centrado:          { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  cargandoTexto:     { marginTop: 12, color: COLORES.textoGris, fontSize: FUENTES.medio * fontScale },
-  errorTexto:        { color: COLORES.rojo, textAlign: 'center', marginBottom: 16, fontSize: FUENTES.medio * fontScale },
-  seccion:           { fontSize: FUENTES.medio * fontScale, fontWeight: 'bold', color: COLORES.primario, paddingHorizontal: 16, paddingVertical: 12 },
-  resumenContenedor: { backgroundColor: COLORES.blanco, borderBottomWidth: 1, borderBottomColor: COLORES.borde },
-  resumenFila:       { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 16, gap: 12 },
-  resumenTarjeta:    { flex: 1, borderRadius: 12, padding: 12, alignItems: 'center', gap: 4 },
-  resumenEmoji:      { fontSize: 22 * fontScale },
-  resumenNumero:     { fontSize: 24 * fontScale, fontWeight: 'bold' },
-  resumenLabel:      { fontSize: 10 * fontScale, fontWeight: '600', textAlign: 'center' },
-  tarjeta:           { backgroundColor: COLORES.blanco, marginHorizontal: 16, marginBottom: 10, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: COLORES.borde },
-  tarjetaFila:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dispositivo:       { fontSize: FUENTES.medio * fontScale, fontWeight: 'bold', color: COLORES.primario },
-  fecha:             { fontSize: 12 * fontScale, color: COLORES.textoGris, marginTop: 4 },
-  badge:             { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
-  badgeTexto:        { fontSize: 12 * fontScale, fontWeight: 'bold' },
-  botonReintentar:   { backgroundColor: COLORES.primario, borderRadius: 8, paddingHorizontal: 20, paddingVertical: 10 },
-  botonReintentarTexto: { color: COLORES.blanco, fontWeight: 'bold', fontSize: FUENTES.medio * fontScale },
+  cargandoTexto:     { marginTop: 12, color: '#64748B', fontSize: 16 * fontScale, fontWeight: '500' },
+  errorTexto:        { color: '#EF4444', textAlign: 'center', marginBottom: 16, fontSize: 16 * fontScale, fontWeight: '600' },
+  
+  seccion:           { 
+    fontSize: 18 * fontScale, 
+    fontWeight: '800', 
+    color: '#1E293B', 
+    paddingHorizontal: 20, 
+    paddingVertical: 16,
+    letterSpacing: 0.3
+  },
+  
+  resumenContenedor: { 
+    backgroundColor: COLORES.blanco, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 2,
+    paddingTop: 8,
+    paddingBottom: 4,
+    marginBottom: 8
+  },
+  resumenFila:       { flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 16, gap: 12 },
+  resumenTarjeta:    { 
+    flex: 1, 
+    borderRadius: 16, 
+    padding: 16, 
+    alignItems: 'center', 
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  resumenEmoji:      { fontSize: 26 * fontScale },
+  resumenNumero:     { fontSize: 28 * fontScale, fontWeight: '900' },
+  resumenLabel:      { fontSize: 11 * fontScale, fontWeight: '800', textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 },
+  
+  tarjeta:           { 
+    backgroundColor: COLORES.blanco, 
+    marginHorizontal: 20, 
+    marginBottom: 16, 
+    borderRadius: 20, 
+    padding: 20, 
+    borderWidth: 1, 
+    borderColor: 'rgba(0,0,0,0.03)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  tarjetaHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  medInfoContainer:  { flex: 1 },
+  medicamentoNombre: { fontSize: 18 * fontScale, fontWeight: '800', color: '#1E293B', marginBottom: 4 },
+  medicamentoDosis:  { fontSize: 14 * fontScale, color: '#64748B', fontWeight: '500' },
+  
+  divisor:           { height: 1, backgroundColor: '#F1F5F9', marginVertical: 16 },
+  
+  tarjetaFooter:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  dispositivo:       { fontSize: 13 * fontScale, fontWeight: '700', color: '#64748B', marginBottom: 2 },
+  fecha:             { fontSize: 12 * fontScale, color: '#94A3B8', fontWeight: '500' },
+  
+  badgePresencial:   { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  badgePresencialTexto:{ color: '#16A34A', fontSize: 11 * fontScale, fontWeight: '800', letterSpacing: 0.3 },
+
+  badge:             { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  badgeTexto:        { fontSize: 12 * fontScale, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  
+  botonReintentar:   { 
+    backgroundColor: COLORES.primario, 
+    borderRadius: 12, 
+    paddingHorizontal: 24, 
+    paddingVertical: 14,
+    shadowColor: COLORES.primario,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  botonReintentarTexto: { color: COLORES.blanco, fontWeight: '800', fontSize: 15 * fontScale, letterSpacing: 0.5 },
 });
